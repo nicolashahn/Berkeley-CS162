@@ -133,7 +133,15 @@ int main(unused int argc, unused char *argv[]) {
       cmd_table[fundex].fun(tokens);
     } else {
       /* REPLACE this to run commands as programs. */
-      fprintf(stdout, "This shell doesn't know how to run programs.\n");
+      int len = tokens_get_length(tokens);
+      char cmd[1024]; 
+      for (int i=0; i<len; i++){
+        strcat(cmd, tokens_get_token(tokens, i));
+        strcat(cmd, " ");
+      }
+      printf("%s\n", cmd);
+      system(cmd);
+      strcpy(cmd, "");
     }
 
     if (shell_is_interactive)
