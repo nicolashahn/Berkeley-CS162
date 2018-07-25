@@ -112,6 +112,41 @@ void init_shell() {
   }
 }
 
+/*From a path formatted like "/usr/bin/wc", get the "wc"*/
+char* get_last_path_token(char *path) {
+  char *pathcp, *tok, *cmd, *ptr;
+  strcpy(pathcp, path);
+  tok = strtok_r(pathcp, "/", &ptr);
+  while (tok != NULL) {
+    tok = strtok_r(NULL, "/", &ptr);
+    if (tok == NULL) break;
+    cmd = tok;
+    fprintf(stdout, "%s\n", cmd);
+  }
+  return cmd;
+}
+
+/*Run a given command with arguments*/
+void run_cmd(struct tokens *tokens){
+
+  int len = tokens_get_length(tokens);
+  char *cmd = tokens_get_token(tokens, 0);
+  char *args[len-1]; 
+
+  for (int i=0; i<len; i++){
+    args[i] = tokens_get_token(tokens, i);
+  }
+  args[0] = get_last_path_token(cmd);
+  args[len] = NULL;
+  fprintf(stdout, "%s\n", cmd);
+  execv(cmd, args);
+  /*clear cmd buffer for next command*/
+  strcpy(cmd, "");
+  for (int i=0; i<len; i++){
+    strcpy(args[i], "");
+  }
+}
+
 int main(unused int argc, unused char *argv[]) {
   init_shell();
 
@@ -132,16 +167,7 @@ int main(unused int argc, unused char *argv[]) {
     if (fundex >= 0) {
       cmd_table[fundex].fun(tokens);
     } else {
-      /* REPLACE this to run commands as programs. */
-      int len = tokens_get_length(tokens);
-      char cmd[1024]; 
-      for (int i=0; i<len; i++){
-        strcat(cmd, tokens_get_token(tokens, i));
-        strcat(cmd, " ");
-      }
-      printf("%s\n", cmd);
-      system(cmd);
-      strcpy(cmd, "");
+      run_cmd(tokens);
     }
 
     if (shell_is_interactive)
