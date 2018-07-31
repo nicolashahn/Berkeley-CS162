@@ -174,23 +174,28 @@ void run_cmd(struct tokens *tokens){
   int env_path_len = get_env_paths(paths);
   char *abs_cmd = get_first_abs_path(paths, env_path_len, cmd);
 
-  for (int i = 0; i < tok_len; i++){
-    args[i] = tokens_get_token(tokens, i);
-  }
+  if (abs_cmd != NULL) {
 
-  args[0] = get_last_path_token(abs_cmd);
-  /*execv args needs to be null terminated*/
-  args[tok_len] = NULL;
+    for (int i = 0; i < tok_len; i++){
+      args[i] = tokens_get_token(tokens, i);
+    }
 
-  pid_t pid = fork();
-  if (pid == 0) {
-    execv(abs_cmd, args);
-    exit(EXIT_SUCCESS);
-  } else if (pid == -1) {
-    /*failed to fork()*/
+    args[0] = get_last_path_token(abs_cmd);
+    /*execv args needs to be null terminated*/
+    args[tok_len] = NULL;
+
+    pid_t pid = fork();
+    if (pid == 0) {
+      execv(abs_cmd, args);
+      exit(EXIT_SUCCESS);
+    } else if (pid == -1) {
+      /*failed to fork()*/
+    } else {
+      int status;
+      wait(&status);
+    }
   } else {
-    int status;
-    wait(&status);
+    fprintf(stderr, "%s: command not found\n", cmd);
   }
 }
 
