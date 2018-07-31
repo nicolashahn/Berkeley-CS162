@@ -112,38 +112,85 @@ void init_shell() {
   }
 }
 
+/* Get PATH env variable, fill array of strings
+ * return value = number of paths */
+int get_env_paths(char** paths) {
+  char *pathvar = strdup(getenv("PATH"));
+  int i = 0;
+  char *p = strtok(pathvar, ":");
+  
+  while (p != NULL) {
+    paths[i++] = p;
+    p = strtok(NULL, ":");
+  }
+  return i;
+}
+
 /*From a path formatted like "/usr/bin/wc", get the "wc"*/
 char* get_last_path_token(char *path) {
-  char *pathcp, *tok, *cmd, *ptr;
+  char *tok, *cmd, *ptr;
+  char *pathcp = malloc(strlen(path));
   strcpy(pathcp, path);
   tok = strtok_r(pathcp, "/", &ptr);
   while (tok != NULL) {
     tok = strtok_r(NULL, "/", &ptr);
     if (tok == NULL) break;
     cmd = tok;
-    fprintf(stdout, "%s\n", cmd);
   }
   return cmd;
+}
+
+/*From a list of paths and a command, return the first combination of*/
+/*<path>/<cmd> that exists*/
+char* get_first_abs_path(char **paths, int env_path_len, char* cmd) {
+
+  for(int i = 0; i < env_path_len; i++) {
+
+    char *full_path = malloc(strlen(paths[i]) + strlen(cmd) + 1);
+    /*Ensures memory is an empty string*/
+    full_path[0] = '\0';
+
+    strcat(full_path, paths[i]);
+    strcat(full_path, "/");
+    strcat(full_path, cmd);
+  
+    /*If file exists, return it*/
+    if (access(full_path, F_OK) != -1) {
+      return full_path;
+    }
+    free(full_path);
+  }
+
+  return NULL;
 }
 
 /*Run a given command with arguments*/
 void run_cmd(struct tokens *tokens){
 
-  int len = tokens_get_length(tokens);
+  int tok_len = tokens_get_length(tokens);
   char *cmd = tokens_get_token(tokens, 0);
-  char *args[len-1]; 
+  char *args[tok_len]; 
+  char *paths[32];
+  int env_path_len = get_env_paths(paths);
+  char *abs_cmd = get_first_abs_path(paths, env_path_len, cmd);
 
-  for (int i=0; i<len; i++){
+  for (int i = 0; i < tok_len; i++){
     args[i] = tokens_get_token(tokens, i);
   }
-  args[0] = get_last_path_token(cmd);
-  args[len] = NULL;
-  fprintf(stdout, "%s\n", cmd);
-  execv(cmd, args);
-  /*clear cmd buffer for next command*/
-  strcpy(cmd, "");
-  for (int i=0; i<len; i++){
-    strcpy(args[i], "");
+
+  args[0] = get_last_path_token(abs_cmd);
+  /*execv args needs to be null terminated*/
+  args[tok_len] = NULL;
+
+  pid_t pid = fork();
+  if (pid == 0) {
+    execv(abs_cmd, args);
+    exit(EXIT_SUCCESS);
+  } else if (pid == -1) {
+    /*failed to fork()*/
+  } else {
+    int status;
+    wait(&status);
   }
 }
 
