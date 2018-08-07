@@ -158,44 +158,76 @@ char* get_first_abs_path(char **paths, int env_path_len, char* cmd) {
     if (access(full_path, F_OK) != -1) {
       return full_path;
     }
-    free(full_path);
   }
 
   return NULL;
+}
+
+/* builds an arg list from tokens_get_tokens() and skips the redirection 
+ * (<, >) chars, also fills input/output redirection outparams*/
+char** get_args(struct tokens *tokens,
+                int tok_len,
+                char **args,
+                char *redir_syn,
+                char *redir_target) {
+  int i;
+  for (i = 0; i < tok_len; i++){
+    char* token = tokens_get_token(tokens, i);
+    if (strcmp(">",token)==0 || strcmp("<",token)==0) {
+      redir_syn[0] = '\0';
+      strcat(redir_syn, token);
+      break;
+    }
+    args[i] = token;
+  }
+  /*execv args needs to be null terminated*/
+  args[i] = NULL;
+  /*last token must be redir_target bc we broke out of for loop*/
+  if (i < tok_len) {
+    redir_target[0] = '\0';
+    strcat(redir_target, tokens_get_token(tokens, i+1));
+  }
+  return args;
 }
 
 /*Run a given command with arguments*/
 void run_cmd(struct tokens *tokens){
 
   int tok_len = tokens_get_length(tokens);
-  char *cmd = tokens_get_token(tokens, 0);
-  char *args[tok_len]; 
-  char *paths[32];
-  int env_path_len = get_env_paths(paths);
-  char *abs_cmd = get_first_abs_path(paths, env_path_len, cmd);
 
-  if (abs_cmd != NULL) {
+  if (tok_len > 0){
 
-    for (int i = 0; i < tok_len; i++){
-      args[i] = tokens_get_token(tokens, i);
-    }
+    char *cmd = tokens_get_token(tokens, 0);
+    char *paths[32];
+    int env_path_len = get_env_paths(paths);
+    char *abs_cmd = get_first_abs_path(paths, env_path_len, cmd);
 
-    args[0] = get_last_path_token(abs_cmd);
-    /*execv args needs to be null terminated*/
-    args[tok_len] = NULL;
+    if (abs_cmd != NULL) {
 
-    pid_t pid = fork();
-    if (pid == 0) {
-      execv(abs_cmd, args);
-      exit(EXIT_SUCCESS);
-    } else if (pid == -1) {
-      /*failed to fork()*/
+      char redir_syn[1];
+      char redir_target[128];
+      char *args[tok_len]; 
+      get_args(tokens, tok_len, args, redir_syn, redir_target);
+      args[0] = get_last_path_token(abs_cmd);
+
+      /*printf("%s\n", redir_syn);*/
+      /*printf("%s\n", redir_target);*/
+
+      redir_syn[0] = '\0';
+
+      pid_t pid = fork();
+      if (pid == 0) {
+        execv(abs_cmd, args);
+        exit(EXIT_SUCCESS);
+      } else if (pid == -1) {
+        /*failed to fork()*/
+      } else {
+        int status;
+        wait(&status);
+      }
     } else {
-      int status;
-      wait(&status);
+      fprintf(stderr, "%s: command not found\n", cmd);
     }
-  } else {
-    fprintf(stderr, "%s: command not found\n", cmd);
   }
 }
 
